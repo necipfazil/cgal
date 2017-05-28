@@ -29,8 +29,8 @@
 #include <list>
 #include <CGAL/Object.h>
 #include <CGAL/Basic_sweep_line_2.h>
-#include <CGAL/Sweep_line_2/Sweep_line_curve_pair.h>
-#include <CGAL/Arrangement_2/Open_hash.h>
+
+#include <boost/unordered_set.hpp>
 
 namespace CGAL {
 
@@ -107,14 +107,10 @@ public:
 
   typedef typename Base::Status_line_iterator         Status_line_iterator;
 
-  typedef CGAL::Curve_pair<Subcurve>                  Curve_pair;
-  typedef CGAL::Curve_pair_hasher<Subcurve>           Curve_pair_hasher;
-  typedef CGAL::Equal_curve_pair<Subcurve>            Equal_curve_pair;
-  typedef Open_hash<Curve_pair, Curve_pair_hasher, Equal_curve_pair>
-                                                      Curve_pair_set;
+  typedef std::pair< const X_monotone_curve_2*,
+                     const X_monotone_curve_2*>      Curve_pair;
 
-  typedef random_access_input_iterator<std::vector<Object> >
-                                                      vector_inserter;
+  typedef boost::unordered_set<Curve_pair>            Curve_pair_set;
 
 protected:
   // Data members:
@@ -124,9 +120,6 @@ protected:
 
   Curve_pair_set m_curves_pair_set;  // A lookup table of pairs of Subcurves
                                      // that have been intersected.
-
-  std::vector<Object> m_x_objects;   // Auxiliary vector for storing the
-                                     // intersection objects.
 
   X_monotone_curve_2 sub_cv1;        // Auxiliary varibales
   X_monotone_curve_2 sub_cv2;        // (for splitting curves).
@@ -169,11 +162,8 @@ protected:
    * \param curve The subcurve to add.
    * \return (true) if an overlap occured; (false) otherwise.
    */
-  virtual bool _add_curve_to_right(Event* event, Subcurve* curve,
+  virtual bool _add_curve_to_right(Event* event, Subcurve& curve,
                                    bool overlap_exist = false);
-
-  /*! Fix overlapping subcurves before handling the current event. */
-  void _fix_overlap_subcurves();
 
   /*! Handle overlap at right insertion to event.
    * \param event The event point.
@@ -181,7 +171,7 @@ protected:
    * \param iter An iterator for the curves.
    * \param overlap_exist
    */
-  void _handle_overlap(Event* event, Subcurve* curve,
+  void _handle_overlap(Event* event, Subcurve& curve,
                        Event_subcurve_iterator iter, bool overlap_exist);
 
   /*! Compute intersections between the two given curves.
@@ -193,15 +183,6 @@ protected:
    */
   void _intersect(Subcurve* c1, Subcurve* c2);
 
-  /*! When a curve is removed from the status line for good, its top and
-   * bottom neighbors become neighbors. This method finds these cases and
-   * looks for the intersection point, if one exists.
-   * \param leftCurve A pointer to the curve that is about to be deleted.
-   * \param remove_for_good Whether the aubcurve is removed for good.
-   */
-  void _remove_curve_from_status_line(Subcurve* leftCurve,
-                                      bool remove_for_good);
-
   /*! Create an intersection-point event between two curves.
    * \param xp The intersection point.
    * \param mult Its multiplicity.
@@ -209,16 +190,12 @@ protected:
    * \param curve2 The second curve.
    * \param is_overlap Whether the two curves overlap at xp.
    */
-  void _create_intersection_point(const Point_2& xp,
+  Event* _create_intersection_point(const Point_2& xp,
                                   unsigned int mult,
                                   Subcurve*& c1,
                                   Subcurve*& c2,
                                   bool is_overlap = false);
 
-  /*! Fix a subcurve that represents an overlap.
-   * \param sc The subcurve.
-   */
-  void _fix_finished_overlap_subcurve(Subcurve* sc);
 };
 
 } //namespace CGAL

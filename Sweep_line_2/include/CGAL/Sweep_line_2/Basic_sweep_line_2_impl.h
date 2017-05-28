@@ -212,11 +212,6 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_init_structures()
 {
   CGAL_assertion(m_queue->empty());
   CGAL_assertion((m_statusLine.size() == 0));
-
-  // Allocate all of the Subcurve objects as one block. Don't allocate
-  // anything when there are no subcurves.
-  if (m_num_of_subCurves > 0)
-    m_subCurves = m_subCurveAlloc.allocate(m_num_of_subCurves);
 }
 
 //-----------------------------------------------------------------------------
@@ -228,13 +223,6 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_complete_sweep()
 {
   CGAL_assertion(m_queue->empty());
   CGAL_assertion((m_statusLine.size() == 0));
-
-  // Free all subcurve objects.
-  for (unsigned int i = 0; i < m_num_of_subCurves; ++i)
-    m_subCurveAlloc.destroy(m_subCurves + i);
-
-  if (m_num_of_subCurves > 0)
-    m_subCurveAlloc.deallocate(m_subCurves, m_num_of_subCurves);
 }
 
 //-----------------------------------------------------------------------------
@@ -260,16 +248,16 @@ _init_point(const Point_2& pt, Attribute type)
 template <typename Tr, typename Vis, typename Subcv, typename Evnt,
           typename Alloc>
 void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
-_init_curve(const X_monotone_curve_2& curve, unsigned int index)
+_init_curve(const X_monotone_curve_2& curve)
 {
   // Construct and initialize a subcurve object.
-  m_subCurveAlloc.construct(m_subCurves + index, m_masterSubcurve);
-  (m_subCurves + index)->set_hint(this->m_statusLine.end());
-  (m_subCurves + index)->init(curve);
+  Subcurve sc(curve);
+  sc.set_x_monotone_curve();
+  sc.set_hint(m_statusLine.end());
 
   // Create two events associated with the curve ends.
-  _init_curve_end(curve, ARR_MAX_END, m_subCurves + index);
-  _init_curve_end(curve, ARR_MIN_END, m_subCurves + index);
+  _init_curve_end(curve, ARR_MAX_END, sc);
+  _init_curve_end(curve, ARR_MIN_END, sc);
 }
 
 //-----------------------------------------------------------------------------
@@ -278,7 +266,7 @@ _init_curve(const X_monotone_curve_2& curve, unsigned int index)
 template <typename Tr, typename Vis, typename Subcv, typename Evnt,
           typename Alloc>
 void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
-_init_curve_end(const X_monotone_curve_2& cv, Arr_curve_end ind, Subcurve* sc)
+_init_curve_end(const X_monotone_curve_2& cv, Arr_curve_end ind, Subcurve& sc)
 {
   // Get the boundary conditions of the curve end.
   const Attribute  end_attr =
@@ -297,8 +285,8 @@ _init_curve_end(const X_monotone_curve_2& cv, Arr_curve_end ind, Subcurve* sc)
       m_traits->construct_max_vertex_2_object()(cv);
 
     pair_res = ((ps_x == ARR_INTERIOR) && (ps_y == ARR_INTERIOR)) ?
-      _push_event(pt, end_attr, ps_x, ps_y, sc) :
-      _push_event(cv, ind, end_attr, ps_x, ps_y, sc);
+      _push_event(pt, end_attr, ps_x, ps_y, &sc) :
+      _push_event(cv, ind, end_attr, ps_x, ps_y, &sc);
 
     // Inform the visitor in case we updated an existing event.
     Event* e = pair_res.first;
@@ -307,7 +295,7 @@ _init_curve_end(const X_monotone_curve_2& cv, Arr_curve_end ind, Subcurve* sc)
   }
   else {
     // The curve end is open, insert it into the event queue.
-    pair_res = _push_event(cv, ind, end_attr, ps_x, ps_y, sc);
+    pair_res = _push_event(cv, ind, end_attr, ps_x, ps_y, &sc);
 
     // Inform the visitor in case we updated an existing event.
     Event* e = pair_res.first;
@@ -326,16 +314,16 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_left_curves()
   CGAL_SL_PRINT_START_EOL("handling left curves at (");
   CGAL_SL_DEBUG(PrintEvent(m_currentEvent));
   CGAL_SL_PRINT_EOL();
-
+  
   m_is_event_on_above = false;
-
+  
   if (! m_currentEvent->has_left_curves()) {
     // The current event does not have any incident left subcurves, so we
     // should find a place for it in the status line (the function we call
     // update the m_status_line_insert_hint and m_is_event_on_above members).
     // We also notify the visitor on the new event we are about to handle.
     _handle_event_without_left_curves();
-
+  
     if (m_currentEvent->is_closed()) {
       if (m_is_event_on_above) {
         // The current event is on the interior of existing curve on the
@@ -343,7 +331,7 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_left_curves()
         // this is possible  only if the event is an isolated query point.
         CGAL_assertion(! m_currentEvent->has_right_curves() &&
                         m_currentEvent->is_query());
-
+  
         //m_is_event_on_above = true;
         m_visitor->before_handle_event(m_currentEvent);
       }
@@ -352,42 +340,42 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_left_curves()
     }
     else
       m_visitor->before_handle_event(m_currentEvent);
-
+  
     // Nothing else to do (no left curves).
     CGAL_SL_PRINT_END_EOL("handling left curves");
     return;
   }
-
+  
   CGAL_SL_PRINT_TEXT("left curves before sorting:");
   CGAL_SL_PRINT_EOL();
   CGAL_SL_DEBUG(if (m_currentEvent->left_curves_begin() !=
                     m_currentEvent->left_curves_end())
                 { print_event_info(m_currentEvent); });
-
+  
   // Use the status-line to sort all left subcurves incident to the current
   // event (no geometric comparisons are neede at all).
   _sort_left_curves();
-
+  
   // Now the event is updated, with its left subcurved properly sorted, and
   // we can inform the visitor that we are about to handle this event.
   m_visitor->before_handle_event(m_currentEvent);
-
+  
   CGAL_SL_PRINT_TEXT("left curves after sorting:");
   CGAL_SL_PRINT_EOL();
   CGAL_SL_DEBUG(if (m_currentEvent->left_curves_begin() !=
                     m_currentEvent->left_curves_end() )
                 { print_event_info(m_currentEvent); });
-
+  
   // Remove all left subcurves from the status line, and inform the visitor
   // that we are done handling these subcurves.
   Event_subcurve_iterator left_iter = m_currentEvent->left_curves_begin();
-
+  
   while (left_iter != m_currentEvent->left_curves_end()) {
-    Subcurve* left_sc = *left_iter;
-
-    m_visitor->add_subcurve(left_sc->last_curve(), left_sc);
+    Subcurve& left_sc = *left_iter;
+  
+    m_visitor->add_subcurve(left_sc.x_monotone_curve(), &left_sc);
     ++left_iter;
-
+  
     _remove_curve_from_status_line(left_sc);
   }
   CGAL_SL_PRINT_END_EOL("handling left curves");
@@ -456,59 +444,27 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_sort_left_curves()
   CGAL_SL_PRINT_START_EOL("sorting left curves");
   CGAL_assertion(m_currentEvent->has_left_curves());
 
-  // Get the first curve associated with the event and its position on the
-  // status line. We proceed from this position up the status line until
-  // we encounter a subcurve that is not associated with the current event.
-  Subcurve* curve = *(m_currentEvent->left_curves_begin());
-  Status_line_iterator sl_iter = curve->hint();
-
-  CGAL_assertion(sl_iter != m_statusLine.end());
-  CGAL_assertion(*sl_iter == curve);
-  // Look for the first curve in the vertical ordering that is also in the
-  // left curve of the event
+  Status_line_iterator sl_iter = m_currentEvent->left_curves_begin()->hint();
   Status_line_iterator end = sl_iter;
-  for (++end; end != m_statusLine.end(); ++end) {
-    if (std::find(m_currentEvent->left_curves_begin(),
-                  m_currentEvent->left_curves_end(), *end) ==
-        m_currentEvent->left_curves_end())
+
+  CGAL_assertion(end!=m_statusLine.end());
+
+  // look for the end of the range
+  do{
+    ++end;
+  }while( end!=m_statusLine.end() &&
+          (*end)->right_event()==m_currentEvent );
+
+  //look for the beginning of the range
+  while(sl_iter!=m_statusLine.begin())
+  {
+    Status_line_iterator prev = cpp11::prev(sl_iter);
+    if ((*prev)->right_event()!=m_currentEvent)
       break;
+    sl_iter=prev;
   }
-
-  if (sl_iter == m_statusLine.begin()) {
-    // In case the lowest subcurve in the status line is associated with the
-    // current event, we have the range of (sorted) subcurves ready. We
-    // associate this range with the event, so the curves are now sorted
-    // according to their vertical positions immediately to the left of the
-    // event.
-    m_currentEvent->replace_left_curves(sl_iter, end);
-    CGAL_SL_PRINT_END_EOL("sorting left curves");
-    return;
-  }
-
-  // Go down the status line until we encounter a subcurve that is not
-  // associated with the current event.
-  for (--sl_iter; sl_iter != m_statusLine.begin(); --sl_iter) {
-    if (std::find(m_currentEvent->left_curves_begin(),
-                  m_currentEvent->left_curves_end(), *sl_iter) ==
-        m_currentEvent->left_curves_end())
-    {
-      // Associate the sorted range of subcurves with the event.
-      m_currentEvent->replace_left_curves(++sl_iter, end);
-      CGAL_SL_PRINT_END_EOL("sorting left curves");
-      return;
-    }
-  }
-
-  // Check if the subcurve at the current iterator position should be
-  // associated with the current event, and select the (sorted) range of
-  // subcurves accordingly.
-  if (std::find(m_currentEvent->left_curves_begin(),
-                m_currentEvent->left_curves_end(), *sl_iter) ==
-      m_currentEvent->left_curves_end())
-    m_currentEvent->replace_left_curves(++sl_iter, end);
-  else
-    m_currentEvent->replace_left_curves(sl_iter, end);
-
+  //now replace the subcurves
+  m_currentEvent->replace_left_curves(sl_iter, end);
   CGAL_SL_PRINT_END_EOL("sorting left curves");
 }
 
@@ -522,11 +478,11 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
   CGAL_SL_PRINT_START("Handling right curves at (");
   CGAL_SL_DEBUG(PrintEvent(m_currentEvent));
   CGAL_SL_PRINT_EOL();
-
+  
   // We have nothing to do if the current event does not have any incident
   // right subcurves.
   if (! m_currentEvent->has_right_curves()) return;
-
+  
   // Loop over the curves to the right of the current event and handle them:
   // Since the curves are non intersecting, the event can represents the
   // left end of the right curves and we have no prior information from the
@@ -535,17 +491,18 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
   Event_subcurve_iterator curr = m_currentEvent->right_curves_begin();
   Event_subcurve_iterator right_end = m_currentEvent->right_curves_end();
   Status_line_iterator sl_iter;
-
+  
   while (curr != right_end) {
     CGAL_SL_PRINT_INSERT(*curr);
-    sl_iter = m_statusLine.insert_before(m_status_line_insert_hint, *curr);
-    Subcurve* sc = *curr;
-    sc->set_hint(sl_iter);
-
-    CGAL_SL_DEBUG(PrintStatusLine(););
+    sl_iter = m_statusLine.insert_before(m_status_line_insert_hint, &(*curr));
+    Subcurve& sc = *curr;
+    sc.set_hint(sl_iter);
+    *sl_iter = sc.right_event()->push_back_curve_to_left(sc);
+  
+    CGAL_SL_DEBUG(PrintStatusLine());
     ++curr;
   }
-
+  
   CGAL_SL_PRINT_STATUS_LINE();
   CGAL_SL_PRINT_END_EOL("handling right curves done");
 }
@@ -556,7 +513,7 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
 template <typename Tr, typename Vis, typename Subcv, typename Evnt,
           typename Alloc>
 bool Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
-_add_curve_to_right(Event* event, Subcurve* curve, bool /* overlap_exist */)
+_add_curve_to_right(Event* event, Subcurve& curve, bool /* overlap_exist */)
 {
 #if defined(CGAL_NO_ASSERTIONS)
   (void) event->add_curve_to_right(curve, m_traits);
@@ -575,7 +532,7 @@ _add_curve_to_right(Event* event, Subcurve* curve, bool /* overlap_exist */)
 template <typename Tr, typename Vis, typename Subcv, typename Evnt,
           typename Alloc>
 void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
-_remove_curve_from_status_line(Subcurve* sc)
+_remove_curve_from_status_line(const Subcurve& sc)
 {
   CGAL_SL_PRINT_START("removing a curve from the status line, ");
   CGAL_SL_PRINT_CURVE(sc);
@@ -583,7 +540,7 @@ _remove_curve_from_status_line(Subcurve* sc)
   CGAL_SL_PRINT_STATUS_LINE();
 
   // Get the position of the subcurve on the status line.
-  Status_line_iterator sl_iter = sc->hint();
+  Status_line_iterator sl_iter = sc.hint();
   CGAL_assertion(sl_iter != m_statusLine.end());
 
   // The position of the next event can be right after the deleted subcurve.
@@ -645,7 +602,7 @@ std::pair<typename Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::Event*,
           bool>
 Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
 _push_event(const Point_2& pt, Attribute type,
-            Arr_parameter_space ps_x, Arr_parameter_space ps_y, Subcurve* sc)
+            Arr_parameter_space ps_x, Arr_parameter_space ps_y, Subcurve* sc_ptr)
 {
   // Look for the point in the event queue.
   Event* e;
@@ -673,15 +630,14 @@ _push_event(const Point_2& pt, Attribute type,
   // endpoints, update the event and the subcurve records accordingly.
   // Note that this must be done before we actually insert the new event
   // into the event queue.
-  if (sc != NULL) {
+  if (sc_ptr != NULL) {
     if (type == Base_event::LEFT_END) {
-      sc->set_left_event(e);
-      _add_curve_to_right(e, sc);
+      sc_ptr->set_left_event(e);
+      _add_curve_to_right(e, *sc_ptr);
     }
     else {
       CGAL_assertion(type == Base_event::RIGHT_END);
-      sc->set_right_event(e);
-      e->add_curve_to_left(sc);
+      sc_ptr->set_right_event(e);
     }
   }
 
@@ -709,7 +665,7 @@ std::pair<typename Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::Event*,
           bool>
 Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
 _push_event(const X_monotone_curve_2& cv, Arr_curve_end ind, Attribute type,
-            Arr_parameter_space ps_x, Arr_parameter_space ps_y, Subcurve* sc)
+            Arr_parameter_space ps_x, Arr_parameter_space ps_y, Subcurve* sc_ptr)
 {
   //cv has no member named 'base'
   //std::cout << "cv: " << cv.base() << std::endl;
@@ -756,15 +712,14 @@ _push_event(const X_monotone_curve_2& cv, Arr_curve_end ind, Attribute type,
   // endpoints, update the event and the subcurve records accordingly.
   // Note that this must be done before we actually insert the new event
   // into the event queue.
-  if (sc != NULL) {
+  if (sc_ptr != NULL) {
     if (type == Base_event::LEFT_END) {
-      sc->set_left_event(e);
-      _add_curve_to_right(e, sc);
+      sc_ptr->set_left_event(e);
+      _add_curve_to_right(e, *sc_ptr);
     }
     else {
       CGAL_assertion(type == Base_event::RIGHT_END);
-      sc->set_right_event(e);
-      e->add_curve_to_left(sc);
+      sc_ptr->set_right_event(e);
     }
   }
 

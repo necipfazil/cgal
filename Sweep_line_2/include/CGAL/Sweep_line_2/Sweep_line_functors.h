@@ -357,12 +357,12 @@ private:
     // of the current event, compare to the right of the event point.
     if (is_c2_right_curve)
       return m_traits->compare_y_at_x_right_2_object()
-        (c1->last_curve(), c2->last_curve(), (*m_curr_event)->point());
+        (c1->x_monotone_curve(), c2->x_monotone_curve(), (*m_curr_event)->point());
 
     // c1 is a right curve of the current event, but c2 is not, compare the
     // y-coordinate of the event and the y-coordinate of c2 at the event.
     return m_traits->compare_y_at_x_2_object()
-      ((*m_curr_event)->point(), c2->last_curve());
+      ((*m_curr_event)->point(), c2->x_monotone_curve());
   }
 
   /*! Compare the vertical position of two subcurves in the status line.
@@ -392,16 +392,16 @@ private:
      * - distinguish betwen left, bottom, and top.
      */
     Arr_parameter_space ps_x1 =
-      m_traits->parameter_space_in_x_2_object()(c1->last_curve(), ARR_MIN_END);
+      m_traits->parameter_space_in_x_2_object()(c1->x_monotone_curve(), ARR_MIN_END);
     Arr_parameter_space ps_y1 = 
-      m_traits->parameter_space_in_y_2_object()(c1->last_curve(), ARR_MIN_END);
+      m_traits->parameter_space_in_y_2_object()(c1->x_monotone_curve(), ARR_MIN_END);
 
     if ((ps_x1 == ARR_INTERIOR) && (ps_y1 == ARR_INTERIOR))
       // The first curve has a valid left endpoint. Compare the y-position
       // of this endpoint to the second subcurve. 
       return m_traits->compare_y_at_x_2_object()
-        (m_traits->construct_min_vertex_2_object()(c1->last_curve()),
-         c2->last_curve());
+        (m_traits->construct_min_vertex_2_object()(c1->x_monotone_curve()),
+         c2->x_monotone_curve());
 
     // We use the fact that the two curves are interior disjoint. As c2 is
     // already in the status line, then if c1 left end has a negative boundary
@@ -432,14 +432,16 @@ public:
    */
   Comparison_result operator()(const Subcurve* c1, const Subcurve* c2) const
   {
-    CGAL_assertion(std::find((*m_curr_event)->right_curves_begin(),
-                             (*m_curr_event)->right_curves_end(), c1) !=
-                   (*m_curr_event)->right_curves_end());
-
-    bool is_c2_right_curve =
-      (std::find((*m_curr_event)->right_curves_begin(),
-                 (*m_curr_event)->right_curves_end(), c2) !=
-       (*m_curr_event)->right_curves_end());
+    // CGAL_assertion(std::find((*m_curr_event)->right_curves_begin(),
+    //                          (*m_curr_event)->right_curves_end(), c1) !=
+    //                (*m_curr_event)->right_curves_end());
+    // 
+    // bool is_c2_right_curve =
+    //   (std::find((*m_curr_event)->right_curves_begin(),
+    //              (*m_curr_event)->right_curves_end(), c2) !=
+    //    (*m_curr_event)->right_curves_end());
+    // SL_SAYS TODO fix the setting of the bool
+    bool is_c2_right_curve = true;
     return operator()(c1, c2, is_c2_right_curve,
                       Are_all_sides_oblivious_category());
   }
@@ -448,7 +450,7 @@ public:
    */
   Comparison_result operator() (const Point_2& pt, const Subcurve *sc) const
   {
-    return (m_traits->compare_y_at_x_2_object()(pt, sc->last_curve()));
+    return (m_traits->compare_y_at_x_2_object()(pt, sc->x_monotone_curve()));
   }
 
 };

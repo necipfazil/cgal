@@ -69,7 +69,7 @@ public:
   typedef Subcurve_                                     Subcurve;
   //template<typename SC>
   //struct SC_container { typedef std::list<SC> other; };
-  typedef std::list<Subcurve*>                          Subcurve_container;
+  typedef std::list<Subcurve>                           Subcurve_container;
   typedef typename Subcurve_container::iterator         Subcurve_iterator;
   typedef typename Subcurve_container::const_iterator   Subcurve_const_iterator;
   typedef typename Subcurve_container::reverse_iterator
@@ -136,66 +136,70 @@ public:
     m_closed = 0;
   }
 
-  /*! Add a subcurve to the container of left curves. */
-  void add_curve_to_left(Subcurve* curve)
-  {
-    // Look for the subcurve.
-    Subcurve_iterator iter;
-
-    //std::cout << "add_curve_to_left, curve: ";
-    //curve->Print();
-
-    for (iter = m_leftCurves.begin(); iter != m_leftCurves.end(); ++iter) {
-      //std::cout << "add_curve_to_left, iter: ";
-      //(*iter)->Print();
-
-      // Do nothing if the curve exists.
-      if ((curve == *iter) || (*iter)->is_inner_node(curve)) {
-        //std::cout << "add_curve_to_left, curve exists" << std::endl;
-        return;
-      }
-
-      // Replace the existing curve in case of overlap.
-      // EBEB 2011-10-27: Fixed to detect overlaps correctly
-      if ((curve != *iter) && (curve->has_common_leaf(*iter))) {
-        //std::cout << "add_curve_to_left, curve overlaps" << std::endl;
-        *iter = curve;
-        return;
-      }
-    }
-
-    // The curve does not exist - insert it to the container.
-    m_leftCurves.push_back(curve);
-    // std::cout << "add_curve_to_left, pushed back" << std::endl;
-
-    //this->Print();
-  }
+  // /*! Add a subcurve to the container of left curves. */
+  // void add_curve_to_left(Subcurve* curve)
+  // {
+  //   // Look for the subcurve.
+  //   Subcurve_iterator iter;
+  // 
+  //   //std::cout << "add_curve_to_left, curve: ";
+  //   //curve->Print();
+  // 
+  //   for (iter = m_leftCurves.begin(); iter != m_leftCurves.end(); ++iter) {
+  //     //std::cout << "add_curve_to_left, iter: ";
+  //     //(*iter)->Print();
+  // 
+  //     // Do nothing if the curve exists.
+  //     if ((curve == *iter) || (*iter)->is_inner_node(curve)) {
+  //       //std::cout << "add_curve_to_left, curve exists" << std::endl;
+  //       return;
+  //     }
+  // 
+  //     // Replace the existing curve in case of overlap.
+  //     // EBEB 2011-10-27: Fixed to detect overlaps correctly
+  //     if ((curve != *iter) && (curve->has_common_leaf(*iter))) {
+  //       //std::cout << "add_curve_to_left, curve overlaps" << std::endl;
+  //       *iter = curve;
+  //       return;
+  //     }
+  //   }
+  // 
+  //   // The curve does not exist - insert it to the container.
+  //   m_leftCurves.push_back(curve);
+  //   // std::cout << "add_curve_to_left, pushed back" << std::endl;
+  // 
+  //   //this->Print();
+  // }
 
   /*! Add a subcurve to the container of left curves (without checks). */
-  void push_back_curve_to_left(Subcurve* curve)
-  { m_leftCurves.push_back(curve); }
+  /// SL_SAYS : TODO make the return type const?
+  Subcurve* push_back_curve_to_left(const Subcurve& curve)
+  {
+     m_leftCurves.push_back(curve); 
+     return &(m_leftCurves.back());
+  }
 
   /*! Add a subcurve to the container of right curves. */
   std::pair<bool, Subcurve_iterator>
-  add_curve_to_right(Subcurve* curve, const Traits_2* tr)
+  add_curve_to_right(const Subcurve& curve, const Traits_2* tr)
   {
     if (m_rightCurves.empty()) {
       m_rightCurves.push_back(curve);
       return (std::make_pair(false, m_rightCurves.begin()));
     }
-
+    
     // Check if its an event at open boundary,
     // and if so then there is no overlap
     //(there cannot be two non-overlap curves at the same event at open
     // boundary).
     if (!this->is_closed())
       return (std::make_pair(true, m_rightCurves.begin()));
-
+    
     Subcurve_iterator iter = m_rightCurves.begin();
     Comparison_result res;
-
+    
     while ((res = tr->compare_y_at_x_right_2_object()
-            (curve->last_curve(), (*iter)->last_curve(), m_point)) == LARGER)
+            (curve.x_monotone_curve(), iter->x_monotone_curve(), m_point)) == LARGER)
     {
       ++iter;
       if (iter == m_rightCurves.end()) {
@@ -203,12 +207,12 @@ public:
         return std::make_pair(false, --iter);
       }
     }
-
+    
     if (res == EQUAL) //overlap !!
     {
       return std::make_pair(true, iter);
     }
-
+    
     m_rightCurves.insert(iter, curve);
     return std::make_pair(false, --iter);
   }
@@ -218,7 +222,7 @@ public:
    *      and sc2 is correct.
    */
   std::pair<bool, Subcurve_iterator>
-  add_curve_pair_to_right(Subcurve* sc1, Subcurve* sc2)
+  add_curve_pair_to_right(const Subcurve& sc1, const Subcurve& sc2)
   {
     m_rightCurves.push_back(sc1);
     m_rightCurves.push_back(sc2);
@@ -228,16 +232,25 @@ public:
     return (std::make_pair(false, iter));
   }
 
+  void clear_curves()
+  {
+    m_leftCurves.clear();
+    m_rightCurves.clear();
+  }
+
   /*! Remove a curve from the set of left curves. */
-  void remove_curve_from_left(Subcurve* curve)
+  void remove_curve_from_left(const Subcurve& curve)
   {
     Subcurve_iterator iter;
-    for (iter = m_leftCurves.begin(); iter!= m_leftCurves.end(); ++iter) {
-      if (curve->has_common_leaf(*iter)) {
+    for (iter = m_leftCurves.begin(); iter!= m_leftCurves.end(); ++iter) 
+    {
+      if (&curve == &(*iter)) {
         m_leftCurves.erase(iter);
         return;
       }
     }
+
+    CGAL_assertion(!"The subcurve to be removed has not been found.");
   }
 
   /*! Returns an iterator to the first curve to the left of the event. */
@@ -331,10 +344,10 @@ public:
   const X_monotone_curve_2& curve() const
   {
     if (has_left_curves())
-      return (m_leftCurves.front()->last_curve());
+      return (m_leftCurves.front().x_monotone_curve());
 
     CGAL_assertion (has_right_curves());
-    return (m_rightCurves.front()->last_curve());
+    return (m_rightCurves.front().x_monotone_curve());
   }
 
   /*! Set the event point. */
@@ -398,24 +411,26 @@ public:
   template <typename InputIterator>
   void replace_left_curves(InputIterator begin, InputIterator end)
   {
-    Subcurve_iterator left_iter = m_leftCurves.begin();
-    for (InputIterator iter = begin; iter != end; ++iter, ++left_iter)
-      *left_iter = static_cast<Subcurve*>(*iter);
-    m_leftCurves.erase(left_iter, m_leftCurves.end());
+    CGAL_assertion(static_cast<std::size_t>(std::distance(begin, end))
+                   == m_leftCurves.size());
+    m_leftCurves.clear();
+  
+    for (InputIterator iter = begin; iter != end; ++iter)
+      m_leftCurves.push_back(*(*iter));
   }
 
   bool is_right_curve_bigger(Subcurve* c1, Subcurve* c2)
   {
+    // SL_SAYS My guess is that this only an optimization for intersection
+    // points when there is no overlap.
+    if (c1->is_overlap() || c2->is_overlap()) return true;
+
     Subcurve_iterator   iter;
     for (iter = m_rightCurves.begin(); iter != m_rightCurves.end(); ++iter) {
-      if ((*iter == c1) ||
-          (static_cast<Subcurve*>((*iter)->originating_subcurve1()) == c1) ||
-          (static_cast<Subcurve*>((*iter)->originating_subcurve2()) == c1))
+      if (c1->has_common_input_curve(*iter))
         return false;
 
-      if ((*iter == c2) ||
-          (static_cast<Subcurve*>((*iter)->originating_subcurve1()) == c2) ||
-          (static_cast<Subcurve*>((*iter)->originating_subcurve2()) == c2))
+      if (c2->has_common_input_curve(*iter))
         return true;
     }
 
@@ -454,46 +469,47 @@ public:
   template<typename Traits, typename Subcurve>
   void Sweep_line_event<Traits, Subcurve>::Print()
   {
-    std::cout << "\tEvent info: "  << "\n" ;
-    if (this->is_closed())
-      std::cout << "\t" << m_point << "\n" ;
-    else {
-      std::cout << "\t";
-      Arr_parameter_space ps_x = this->parameter_space_in_x();
-      Arr_parameter_space ps_y = this->parameter_space_in_y();
-
-      switch (ps_x) {
-       case ARR_LEFT_BOUNDARY:  std::cout << "left boundary"; break;
-       case ARR_RIGHT_BOUNDARY: std::cout << "right boundary"; break;
-       case ARR_INTERIOR:
-       default:
-        switch (ps_y) {
-         case ARR_BOTTOM_BOUNDARY: std::cout << "bottom boundary"; break;
-         case ARR_TOP_BOUNDARY:    std::cout << "top boundary"; break;
-         case ARR_INTERIOR:
-         default:
-          CGAL_error();
-        }
-      }
-    }
-    std::cout << "\n";
-
-    std::cout << "\tLeft curves: \n" ;
-    Subcurve_iterator iter;
-    for (iter = m_leftCurves.begin(); iter != m_leftCurves.end(); ++iter) {
-      std::cout << "\t";
-      (*iter)->Print();
-      std::cout << "\n";
-    }
-    std::cout << std::endl;
-    std::cout << "\tRight curves: \n" ;
-    for (iter = m_rightCurves.begin(); iter != m_rightCurves.end(); ++iter) {
-      std::cout << "\t";
-      (*iter)->Print();
-      std::cout << "\n";
-    }
-
-    std::cout << std::endl;
+    /// SL_SAYS: TODO
+    // std::cout << "\tEvent info: "  << "\n" ;
+    // if (this->is_closed())
+    //   std::cout << "\t" << m_point << "\n" ;
+    // else {
+    //   std::cout << "\t";
+    //   Arr_parameter_space ps_x = this->parameter_space_in_x();
+    //   Arr_parameter_space ps_y = this->parameter_space_in_y();
+    // 
+    //   switch (ps_x) {
+    //    case ARR_LEFT_BOUNDARY:  std::cout << "left boundary"; break;
+    //    case ARR_RIGHT_BOUNDARY: std::cout << "right boundary"; break;
+    //    case ARR_INTERIOR:
+    //    default:
+    //     switch (ps_y) {
+    //      case ARR_BOTTOM_BOUNDARY: std::cout << "bottom boundary"; break;
+    //      case ARR_TOP_BOUNDARY:    std::cout << "top boundary"; break;
+    //      case ARR_INTERIOR:
+    //      default:
+    //       CGAL_error();
+    //     }
+    //   }
+    // }
+    // std::cout << "\n";
+    // 
+    // std::cout << "\tLeft curves: \n" ;
+    // Subcurve_iterator iter;
+    // for (iter = m_leftCurves.begin(); iter != m_leftCurves.end(); ++iter) {
+    //   std::cout << "\t";
+    //   (*iter)->Print();
+    //   std::cout << "\n";
+    // }
+    // std::cout << std::endl;
+    // std::cout << "\tRight curves: \n" ;
+    // for (iter = m_rightCurves.begin(); iter != m_rightCurves.end(); ++iter) {
+    //   std::cout << "\t";
+    //   (*iter)->Print();
+    //   std::cout << "\n";
+    // }
+    // 
+    // std::cout << std::endl;
   }
 #endif // CGAL_SL_VERBOSE
 

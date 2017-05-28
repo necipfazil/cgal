@@ -168,9 +168,6 @@ public:
   typedef typename Allocator::template rebind<Event>    Event_alloc_rebind;
   typedef typename Event_alloc_rebind::other            Event_alloc;
 
-  typedef typename Allocator::template rebind<Subcurve> Subcurve_alloc_rebind;
-  typedef typename Subcurve_alloc_rebind::other         Subcurve_alloc;
-
 protected:
   /*! \struct
    * An auxiliary functor for comparing event pointers.
@@ -197,7 +194,6 @@ protected:
 
   Event_queue* m_queue;             // The event queue (the X-structure).
 
-  Subcurve* m_subCurves;            // An array of the subcurves.
   Status_line m_statusLine;         // The status line (the Y-structure).
 
   Allocated_events_set m_allocated_events;
@@ -214,7 +210,6 @@ protected:
                                     // associated with isolated query points.
 
   Event_alloc m_eventAlloc;         // An allocator for the events objects.
-  Subcurve_alloc m_subCurveAlloc;   // An allocator for the subcurve objects.
 
   Event m_masterEvent;              // A master Event (created once by the
                                     // constructor) for the allocator's usage.
@@ -380,9 +375,8 @@ protected:
                     CurveInputIterator curves_end)
   {
     CurveInputIterator cit;
-    unsigned int index = 0;
-    for (cit = curves_begin; cit != curves_end; ++cit, ++index)
-      _init_curve(*cit, index);
+    for (cit = curves_begin; cit != curves_end; ++cit)
+      _init_curve(*cit);
   }
 
   /*! Initiliaze the sweep algorithm. */
@@ -410,9 +404,8 @@ protected:
 
   /*! Initialize the events associated with an x-monotone curve.
    * \param curve The given x-monotone curve.
-   * \param index Its unique index.
    */
-  void _init_curve(const X_monotone_curve_2& curve, unsigned int index);
+  void _init_curve(const X_monotone_curve_2& curve);
 
   /*! Initialize an event associated with an x-monotone curve end.
    * \param cv The given x-monotone curve.
@@ -420,7 +413,7 @@ protected:
    * \param sc The subcurve corresponding to cv.
    */
   void _init_curve_end(const X_monotone_curve_2& cv, Arr_curve_end ind,
-                       Subcurve* sc);
+                       Subcurve& sc);
 
   /*! Handle the subcurves that are to the left of the event point (i.e.,
    * subcurves that we are done with).
@@ -446,11 +439,11 @@ protected:
    * \param curve The subcurve to add.
    * \return (true) if an overlap occured; (false) otherwise.
    */
-  virtual bool _add_curve_to_right(Event* event, Subcurve* curve,
+  virtual bool _add_curve_to_right(Event* event, Subcurve& curve,
                                    bool overlap_exist = false);
 
   /*! Remove a curve from the status line. */
-  void _remove_curve_from_status_line(Subcurve *leftCurve);
+  void _remove_curve_from_status_line(const Subcurve& leftCurve);
 
   /*! Allocate an event object associated with a given point.
    * \param pt The point.
@@ -480,7 +473,7 @@ protected:
    * \param type The event type.
    * \param ps_x The location of the point in x.
    * \param ps_y The location of the point in y.
-   * \param sc A subcurve that the new event represents on of its endpoints.
+   * \param sc_ptr A subcurve that the new event represents on of its endpoints.
    * \return A pair that comprises a pointer to the event, and a flag
    *         indicating whether this is a new event (if false, the event
    *         was in the queue and we just updated it).
@@ -488,7 +481,7 @@ protected:
   std::pair<Event*, bool> _push_event(const Point_2& pt, Attribute type,
                                       Arr_parameter_space ps_x,
                                       Arr_parameter_space ps_y,
-                                      Subcurve* sc = NULL);
+                                      Subcurve* sc_ptr = NULL);
 
   /*! Push an event point associated with a curve end into the event queue.
    * \param cv The x-monotone curve.
@@ -496,7 +489,7 @@ protected:
    * \param type The event type.
    * \param ps_x The location of the point in x.
    * \param ps_y The location of the point in y.
-   * \param sc A subcurve that the new event represents on of its endpoints.
+   * \param sc_ptr A subcurve that the new event represents on of its endpoints.
    * \return A pair that comprises a pointer to the event, and a flag
    *         indicating whether this is a new event (if false, the event
    *         was in the queue and we just updated it).
@@ -506,7 +499,7 @@ protected:
                                       Attribute type,
                                       Arr_parameter_space ps_x,
                                       Arr_parameter_space ps_y,
-                                      Subcurve* sc = NULL);
+                                      Subcurve* sc_ptr = NULL);
 
   void _update_event_at_open_boundary(Event* e,
                                       const X_monotone_curve_2& cv,
