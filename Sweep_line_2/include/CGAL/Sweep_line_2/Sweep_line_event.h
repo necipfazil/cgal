@@ -175,6 +175,11 @@ public:
   /// SL_SAYS : TODO make the return type const?
   Subcurve* push_back_curve_to_left(const Subcurve& curve)
   {
+    #ifdef CGAL_SL_VERBOSE
+    std::cout << "Adding curve to left ";
+    curve.Print();
+    std::cout << "\n";
+    #endif
      m_leftCurves.push_back(curve); 
      return &(m_leftCurves.back());
   }
@@ -183,8 +188,13 @@ public:
   std::pair<bool, Subcurve_iterator>
   add_curve_to_right(const Subcurve& curve, const Traits_2* tr)
   {
+    #ifdef CGAL_SL_VERBOSE
+    std::cout << "Adding curve to right " << &curve << "\n";
+    #endif
+
     if (m_rightCurves.empty()) {
       m_rightCurves.push_back(curve);
+      m_rightCurves.back().set_left_event(this);
       return (std::make_pair(false, m_rightCurves.begin()));
     }
     
@@ -203,8 +213,9 @@ public:
     {
       ++iter;
       if (iter == m_rightCurves.end()) {
-        m_rightCurves.insert(iter, curve);
-        return std::make_pair(false, --iter);
+        iter=m_rightCurves.insert(iter, curve);
+        iter->set_left_event(this);
+        return std::make_pair(false, iter);
       }
     }
     
@@ -213,8 +224,9 @@ public:
       return std::make_pair(true, iter);
     }
     
-    m_rightCurves.insert(iter, curve);
-    return std::make_pair(false, --iter);
+    iter=m_rightCurves.insert(iter, curve);
+    iter->set_left_event(this);
+    return std::make_pair(false, iter);
   }
 
   /*! Add two Subcurves to the right of the event.
@@ -225,7 +237,9 @@ public:
   add_curve_pair_to_right(const Subcurve& sc1, const Subcurve& sc2)
   {
     m_rightCurves.push_back(sc1);
+    m_rightCurves.back().set_left_event(this);
     m_rightCurves.push_back(sc2);
+    m_rightCurves.back().set_left_event(this);
 
     Subcurve_iterator iter = m_rightCurves.end();
     --iter;
@@ -241,6 +255,8 @@ public:
   /*! Remove a curve from the set of left curves. */
   void remove_curve_from_left(const Subcurve& curve)
   {
+    std::cout << "Remove curve from left " << &curve << "\n";
+
     Subcurve_iterator iter;
     for (iter = m_leftCurves.begin(); iter!= m_leftCurves.end(); ++iter) 
     {
@@ -413,10 +429,15 @@ public:
   {
     CGAL_assertion(static_cast<std::size_t>(std::distance(begin, end))
                    == m_leftCurves.size());
-    m_leftCurves.clear();
   
+    Subcurve_container tmp;
     for (InputIterator iter = begin; iter != end; ++iter)
-      m_leftCurves.push_back(*(*iter));
+    {
+      tmp.push_back( reinterpret_cast<Subcurve&>( *(*iter) )  );
+      tmp.back().set_hint(iter);
+      *iter=&tmp.back();
+    }
+    m_leftCurves.swap(tmp);
   }
 
   bool is_right_curve_bigger(Subcurve* c1, Subcurve* c2)
@@ -469,47 +490,46 @@ public:
   template<typename Traits, typename Subcurve>
   void Sweep_line_event<Traits, Subcurve>::Print()
   {
-    /// SL_SAYS: TODO
-    // std::cout << "\tEvent info: "  << "\n" ;
-    // if (this->is_closed())
-    //   std::cout << "\t" << m_point << "\n" ;
-    // else {
-    //   std::cout << "\t";
-    //   Arr_parameter_space ps_x = this->parameter_space_in_x();
-    //   Arr_parameter_space ps_y = this->parameter_space_in_y();
-    // 
-    //   switch (ps_x) {
-    //    case ARR_LEFT_BOUNDARY:  std::cout << "left boundary"; break;
-    //    case ARR_RIGHT_BOUNDARY: std::cout << "right boundary"; break;
-    //    case ARR_INTERIOR:
-    //    default:
-    //     switch (ps_y) {
-    //      case ARR_BOTTOM_BOUNDARY: std::cout << "bottom boundary"; break;
-    //      case ARR_TOP_BOUNDARY:    std::cout << "top boundary"; break;
-    //      case ARR_INTERIOR:
-    //      default:
-    //       CGAL_error();
-    //     }
-    //   }
-    // }
-    // std::cout << "\n";
-    // 
-    // std::cout << "\tLeft curves: \n" ;
-    // Subcurve_iterator iter;
-    // for (iter = m_leftCurves.begin(); iter != m_leftCurves.end(); ++iter) {
-    //   std::cout << "\t";
-    //   (*iter)->Print();
-    //   std::cout << "\n";
-    // }
-    // std::cout << std::endl;
-    // std::cout << "\tRight curves: \n" ;
-    // for (iter = m_rightCurves.begin(); iter != m_rightCurves.end(); ++iter) {
-    //   std::cout << "\t";
-    //   (*iter)->Print();
-    //   std::cout << "\n";
-    // }
-    // 
-    // std::cout << std::endl;
+    std::cout << "\tEvent info: "  << "\n" ;
+    if (this->is_closed())
+      std::cout << "\t" << m_point << "\n" ;
+    else {
+      std::cout << "\t";
+      Arr_parameter_space ps_x = this->parameter_space_in_x();
+      Arr_parameter_space ps_y = this->parameter_space_in_y();
+    
+      switch (ps_x) {
+       case ARR_LEFT_BOUNDARY:  std::cout << "left boundary"; break;
+       case ARR_RIGHT_BOUNDARY: std::cout << "right boundary"; break;
+       case ARR_INTERIOR:
+       default:
+        switch (ps_y) {
+         case ARR_BOTTOM_BOUNDARY: std::cout << "bottom boundary"; break;
+         case ARR_TOP_BOUNDARY:    std::cout << "top boundary"; break;
+         case ARR_INTERIOR:
+         default:
+          CGAL_error();
+        }
+      }
+    }
+    std::cout << "\n";
+    
+    std::cout << "\tLeft curves: \n" ;
+    Subcurve_iterator iter;
+    for (iter = m_leftCurves.begin(); iter != m_leftCurves.end(); ++iter) {
+      std::cout << "\t";
+      iter->Print();
+      std::cout << "\n";
+    }
+    std::cout << std::endl;
+    std::cout << "\tRight curves: \n" ;
+    for (iter = m_rightCurves.begin(); iter != m_rightCurves.end(); ++iter) {
+      std::cout << "\t";
+      iter->Print();
+      std::cout << "\n";
+    }
+    
+    std::cout << std::endl;
   }
 #endif // CGAL_SL_VERBOSE
 

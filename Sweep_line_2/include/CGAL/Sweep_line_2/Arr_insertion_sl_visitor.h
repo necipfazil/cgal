@@ -97,10 +97,10 @@ public:
 template <typename Hlpr> 
 bool Arr_insertion_sl_visitor<Hlpr>::is_split_event(Subcurve* sc, Event* event)
 {
-  if (sc->last_curve().halfedge_handle() == Halfedge_handle(NULL))
+  if (sc->x_monotone_curve().halfedge_handle() == Halfedge_handle(NULL))
     return false;
 
-  if (! sc->originating_subcurve1()) {
+  if (! sc->is_overlap()) {
     return (reinterpret_cast<Event*>(sc->left_event()) != 
             this->current_event());
   }

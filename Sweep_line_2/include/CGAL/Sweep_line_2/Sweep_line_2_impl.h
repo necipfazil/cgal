@@ -69,6 +69,14 @@ template <typename Tr, typename Vis, typename Subcv, typename Evnt,
           typename Alloc>
 void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_left_curves()
 {
+  for(Status_line_iterator sliter=this->m_statusLine.begin();
+                           sliter!=this->m_statusLine.end(); ++sliter)
+  {
+    CGAL_assertion((*sliter)->hint()==sliter);
+  }
+
+  
+  
   CGAL_SL_PRINT_START("handling left curves at (");
   CGAL_SL_DEBUG(this->PrintEvent(this->m_currentEvent));
   CGAL_SL_PRINT_TEXT(")");
@@ -132,7 +140,7 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_left_curves()
       // add it to the left curve of the event and update the status line
       *sl_it = this->m_currentEvent->push_back_curve_to_left(left_subcurve);
       //SL_SAYS : TODO Ask Efi what the visitor expects
-      this->m_visitor->update_event(this->m_currentEvent, *sl_it);
+      this->m_visitor->update_event(this->m_currentEvent, reinterpret_cast<Subcurve*>(*sl_it));
 
       // If necessary, add the subcurves as a right incident curve as well.
       // We also check for overlaps.
@@ -179,7 +187,6 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_left_curves()
   Event_subcurve_iterator left_iter = this->m_currentEvent->left_curves_begin();
   while (left_iter != this->m_currentEvent->left_curves_end()) {
     Subcurve& left_sc = *left_iter;
-
     this->m_visitor->add_subcurve(left_sc.x_monotone_curve(), &left_sc);
     ++left_iter;
 
@@ -222,7 +229,8 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
     this->m_currentEvent->right_curves_end();
   
 
-  Subcurve& sc = *currentOne;  
+  Subcurve& sc = *currentOne;
+  CGAL_assertion( reinterpret_cast<Event*>(sc.left_event())==this->m_currentEvent );
   CGAL_SL_PRINT_INSERT(&sc);
   Status_line_iterator slIter =
     this->m_statusLine.insert_before(this->m_status_line_insert_hint, &sc);
@@ -236,13 +244,12 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
     _intersect(static_cast<Subcurve*>(*prev), static_cast<Subcurve*>(*slIter));
   }
   
-  Event_subcurve_iterator prevOne = currentOne;
+  Subcurve* prev_sc = reinterpret_cast<Subcurve*>(*slIter);
   ++currentOne;
   while (currentOne != rightCurveEnd) {
     Subcurve& sc = *currentOne;
   
     CGAL_SL_PRINT_INSERT(&sc);
-  
     slIter =
       this->m_statusLine.insert_before(this->m_status_line_insert_hint, &sc);
     sc.set_hint(slIter);
@@ -258,10 +265,10 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
     // if (!this->m_currentEvent->are_left_neighbours
     //     (static_cast<Subcurve*>(*currentOne), static_cast<Subcurve*>(*prevOne)))
     {
-      _intersect(&(*prevOne), &(*currentOne));
+      _intersect(prev_sc, reinterpret_cast<Subcurve*>(*slIter));
     }
   
-    prevOne = currentOne;
+    prev_sc = reinterpret_cast<Subcurve*>(*slIter);
     ++currentOne;
   }
   
@@ -270,10 +277,10 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
   //the next Subcurve at the status line
   ++slIter;
   if (slIter != this->m_statusLine.end())
-    _intersect(static_cast<Subcurve*>(&(*prevOne)),
+    _intersect(static_cast<Subcurve*>(prev_sc),
                static_cast<Subcurve*>(*slIter));
 
-  this->m_currentEvent->clear_curves()
+  this->m_currentEvent->clear_curves();
   
   CGAL_SL_PRINT_END_EOL("handling right curves");
 }
@@ -289,14 +296,16 @@ _add_curve_to_right(Event* event, Subcurve& curve, bool overlap_exist)
   CGAL_SL_PRINT_START("adding a Curve to the right of (");
   CGAL_SL_DEBUG(this->PrintEvent(event));
   CGAL_SL_PRINT_TEXT(") ");
-  CGAL_SL_PRINT_CURVE(curve);
+  CGAL_SL_PRINT_CURVE(&curve);
   CGAL_SL_PRINT_EOL();
-  
+
+  CGAL_assertion(reinterpret_cast<Event*>(curve.left_event())==event);
+
   Event_subcurve_iterator iter;
   for (iter = event->right_curves_begin(); iter != event->right_curves_end();
        ++iter)
   {
-    CGAL_SL_PRINT_CURVE(*iter);
+    CGAL_SL_PRINT_CURVE(&(*iter));
     CGAL_SL_PRINT_EOL();
     
     if (curve.has_common_input_curve(*iter))
@@ -308,12 +317,14 @@ _add_curve_to_right(Event* event, Subcurve& curve, bool overlap_exist)
         return false;
       }
       // partial overlap, need to split the curve
-      if (this->m_queueEventLess(curve.right_event(), iter->right_event()))
+      if (this->m_queueEventLess(
+            reinterpret_cast<Event*>(curve.right_event()), 
+            reinterpret_cast<Event*>(iter->right_event())))
         curve.swap(*iter);
 
       iter->merge_input_curves(curve);
       curve.set_left_event(iter->right_event());
-      _add_curve_to_right(iter->right_event(), curve, false); // SL_SAYS : TODO NOT SURE ABOUT the value of overlap_exist here
+      _add_curve_to_right(reinterpret_cast<Event*>(iter->right_event()), curve, false); // SL_SAYS : TODO NOT SURE ABOUT the value of overlap_exist here
       return false;
     }
   }
@@ -352,6 +363,9 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_intersect(Subcurve* c1,
   CGAL_SL_PRINT_CURVE(c2);
   CGAL_SL_PRINT_EOL();
 
+  CGAL_assertion(*(c1->hint())==c1);
+  CGAL_assertion(*(c2->hint())==c2);
+
   typedef typename Tr::Multiplicity Multiplicity;
 
   CGAL_assertion(c1 != c2);
@@ -360,8 +374,9 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_intersect(Subcurve* c1,
   if (!c1->is_overlap() && !c2->is_overlap())
     if (! m_curves_pair_set.insert(
             make_sorted_pair( &(c1->x_monotone_input_curve()),
-                              &(c1->x_monotone_input_curve()) ) ).second )
+                              &(c2->x_monotone_input_curve()) ) ).second )
     {
+      CGAL_SL_PRINT_END_EOL("computing intersection (intersection already inserted) ");
       return;  //the curves have already been checked for intersection
     }
 
@@ -410,7 +425,18 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_intersect(Subcurve* c1,
 
   //Note : no need to filter intersection points, x-monotone curves are tight
   bool first_intersection=true;
+  Subcurve* original_c1 = NULL, * original_c2=NULL;
+  Event* original_re_1 = NULL, * original_re_2=NULL;
   for (; vi != vi_end; ++vi) {
+    
+    if (first_intersection)
+    {
+      original_c1=c1;
+      original_c2=c2;
+      original_re_1=c1->right_event();
+      original_re_2=c2->right_event();
+    }
+    
     const X_monotone_curve_2* icv;
     Point_2 xp;
     unsigned int multiplicity = 0;
@@ -440,14 +466,22 @@ void Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_intersect(Subcurve* c1,
     }
     if (first_intersection)
     {
-      c1->right_event()->remove_curve_from_left(*c1);
-      c2->right_event()->remove_curve_from_left(*c2);
+      std::cout << "first intersection! --- " <<  first_event->point() << "\n";
+      
+      
+      //update the right event of the curves
       c1->set_right_event(first_event);
+      CGAL_assertion(c1->right_event()==first_event);
       c2->set_right_event(first_event);
-      first_event->push_back_curve_to_left(*c1);
-      first_event->push_back_curve_to_left(*c2);
+      c1->set_hint(original_c1->hint());
+      c2->set_hint(original_c2->hint());
+      //replace them in the status line
+      *(original_c1->hint()) = first_event->push_back_curve_to_left(*c1);
+      *(original_c2->hint()) = first_event->push_back_curve_to_left(*c2);
+      original_re_1->remove_curve_from_left(*original_c1);
+      original_re_2->remove_curve_from_left(*original_c2);
+      first_intersection=false;
     }
-    first_intersection=false;
   }
 
   CGAL_SL_PRINT_END_EOL("computing intersection");
@@ -463,7 +497,7 @@ typename Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::Event*
 Sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
 _create_intersection_point(const Point_2& xp,
                            unsigned int multiplicity,
-                           Subcurve*& c1, Subcurve*& c2,
+                           Subcurve* c1, Subcurve* c2,
                            bool is_overlap)
 {
   CGAL_SL_PRINT_START_EOL("creating an intersection point between");
@@ -502,8 +536,7 @@ _create_intersection_point(const Point_2& xp,
       if ((multiplicity % 2) == 1) {
         // The mutiplicity of the intersection point is odd: Swap their
         // order to the right of this point.
-        std::swap(c1,c2);
-        e->add_curve_pair_to_right(*c1, *c2);
+        e->add_curve_pair_to_right(*c2, *c1);
       }
       else {
         // The mutiplicity of the intersection point is even, so they
@@ -577,9 +610,9 @@ _handle_overlap(Event* event, Subcurve& curve, Event_subcurve_iterator iter,
   CGAL_SL_DEBUG(this->PrintEvent(event));
   CGAL_SL_PRINT_TEXT(") ");
   CGAL_SL_PRINT_EOL();
-  CGAL_SL_PRINT_CURVE(curve);
+  CGAL_SL_PRINT_CURVE(&curve);
   CGAL_SL_PRINT_EOL();
-  CGAL_SL_PRINT_CURVE(*iter);
+  CGAL_SL_PRINT_CURVE(&(*iter));
   CGAL_SL_PRINT_EOL();
 
   X_monotone_curve_2 overlap_cv;
@@ -742,13 +775,13 @@ _handle_overlap(Event* event, Subcurve& curve, Event_subcurve_iterator iter,
   // Set the two events' attribute to overlap.
   event->set_overlap();
 
-  CGAL_SL_PRINT_CURVE(curve);
+  CGAL_SL_PRINT_CURVE(&curve);
   CGAL_SL_PRINT_TEXT(" + ");
-  CGAL_SL_PRINT_CURVE(*iter);
+  CGAL_SL_PRINT_CURVE(&(*iter));
   CGAL_SL_PRINT_TEXT(" => ");
   CGAL_SL_PRINT_EOL();
   CGAL_SL_PRINT_TEXT("  ");
-  CGAL_SL_PRINT_CURVE(overlap_sc);
+  CGAL_SL_PRINT_CURVE(&overlap_sc);
   CGAL_SL_PRINT_EOL();
 
   _add_curve_to_right(event, overlap_sc);

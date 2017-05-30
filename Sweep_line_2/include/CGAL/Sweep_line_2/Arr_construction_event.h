@@ -110,7 +110,7 @@ public:
 
   /*! Add a curve to the right of the event. */
   std::pair<bool, Subcurve_iterator>
-  add_curve_to_right (Subcurve *curve,
+  add_curve_to_right (const Subcurve& curve,
                       const Traits_2 * tr)
   {
     std::pair<bool,Subcurve_iterator> res =
@@ -156,7 +156,7 @@ public:
 
     for (--iter; iter != this->m_rightCurves.begin() ; --iter, ++counter)
     {
-      if (curve == (*iter))
+      if (curve->equal(*iter)) //SL_SAYS TODO might be slow
       {
         m_isCurveInArr[counter] = true;
 
@@ -172,7 +172,7 @@ public:
         i++;
     }
 
-    CGAL_assertion(curve == (*iter));
+    CGAL_assertion(curve->equal(*iter));
     m_isCurveInArr[counter] = true;
 
     if (num_left_curves == 0)
@@ -191,7 +191,7 @@ public:
 
     Subcurve_reverse_iterator  rev_iter;
     for (rev_iter = this->m_rightCurves.rbegin();
-         rev_iter != this->m_rightCurves.rend() && curve != (*rev_iter) ;
+         rev_iter != this->m_rightCurves.rend() && !curve->equal(*rev_iter) ;
          ++rev_iter, ++ counter)
     {
       if(m_isCurveInArr[counter] == true)

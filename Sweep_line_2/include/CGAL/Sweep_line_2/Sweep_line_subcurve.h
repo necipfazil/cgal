@@ -153,7 +153,7 @@ public:
 
   bool equal(const Self& other) const
   {
-    if (left_event()!=other->left_event() || right_event()!=other.right_event())
+    if (left_event()!=other.left_event() || right_event()!=other.right_event())
       return false;
     return m_input_curves==other.m_input_curves;
   }
@@ -301,11 +301,16 @@ public:
   template<class Traits>
   void Sweep_line_subcurve<Traits>::Print() const
   {
-    /// SL_SAYS: TODO
-    // std::cout << "Curve " << this
-    //           << "  (" << m_lastCurve << ") "
-    //           << " [sc1: " << m_orig_subcurve1
-    //           << ", sc2: " << m_orig_subcurve2 << "]";
+    std::cout << "Curve " << this
+              << "  (" << m_xcurve << ") "
+              << " [ ";
+    for (typename Input_curve_set::const_iterator it=m_input_curves.begin();
+                                                  it!=m_input_curves.end();
+                                                  ++it)
+    {
+      std::cout << *it << " ";
+    }
+    std::cout << "]";
   }
 #endif
 

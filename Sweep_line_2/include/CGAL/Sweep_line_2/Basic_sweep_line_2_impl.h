@@ -445,6 +445,8 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_sort_left_curves()
   CGAL_assertion(m_currentEvent->has_left_curves());
 
   Status_line_iterator sl_iter = m_currentEvent->left_curves_begin()->hint();
+  CGAL_assertion(*sl_iter==&(*m_currentEvent->left_curves_begin()));
+  CGAL_assertion(reinterpret_cast<Event*>((*sl_iter)->right_event())==m_currentEvent);
   Status_line_iterator end = sl_iter;
 
   CGAL_assertion(end!=m_statusLine.end());
@@ -453,13 +455,13 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_sort_left_curves()
   do{
     ++end;
   }while( end!=m_statusLine.end() &&
-          (*end)->right_event()==m_currentEvent );
+          reinterpret_cast<Event*>((*end)->right_event())==m_currentEvent );
 
   //look for the beginning of the range
   while(sl_iter!=m_statusLine.begin())
   {
     Status_line_iterator prev = cpp11::prev(sl_iter);
-    if ((*prev)->right_event()!=m_currentEvent)
+    if (reinterpret_cast<Event*>((*prev)->right_event())!=m_currentEvent)
       break;
     sl_iter=prev;
   }
@@ -493,7 +495,7 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::_handle_right_curves()
   Status_line_iterator sl_iter;
   
   while (curr != right_end) {
-    CGAL_SL_PRINT_INSERT(*curr);
+    CGAL_SL_PRINT_INSERT(&(*curr));
     sl_iter = m_statusLine.insert_before(m_status_line_insert_hint, &(*curr));
     Subcurve& sc = *curr;
     sc.set_hint(sl_iter);
@@ -535,7 +537,7 @@ void Basic_sweep_line_2<Tr, Vis, Subcv, Evnt, Alloc>::
 _remove_curve_from_status_line(const Subcurve& sc)
 {
   CGAL_SL_PRINT_START("removing a curve from the status line, ");
-  CGAL_SL_PRINT_CURVE(sc);
+  CGAL_SL_PRINT_CURVE(&sc);
   CGAL_SL_PRINT_EOL();
   CGAL_SL_PRINT_STATUS_LINE();
 

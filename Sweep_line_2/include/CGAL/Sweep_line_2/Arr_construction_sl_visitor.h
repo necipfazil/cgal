@@ -340,7 +340,7 @@ after_handle_event(Event* event, Status_line_iterator iter, bool /* flag */)
     // We give index to the topmost subcurve from the right, and add this
     // vertex indices list of the curve the event "sees" from below.
     ++m_sc_counter;
-    (*(event->right_curves_rbegin()))->set_index(m_sc_counter);
+    (*(event->right_curves_rbegin())).set_index(m_sc_counter);
     if (iter != this->status_line_end()) {
       // The vertex "sees" the subcurve of the given position from below.
       Subcurve* sc_above = *iter;
@@ -363,7 +363,7 @@ after_handle_event(Event* event, Status_line_iterator iter, bool /* flag */)
        left_it != event->left_curves_end();
        ++left_it)
   {
-    (*left_it)->set_last_event(event);
+    (*left_it).set_last_event(event);
   }
 
   // In case there are no right subcurves, the event can be deallocated.
@@ -384,7 +384,7 @@ after_handle_event(Event* event, Status_line_iterator iter, bool /* flag */)
        right_it != event->right_curves_end();
        ++right_it)
   {
-    (*right_it)->set_last_event(event);
+    (*right_it).set_last_event(event);
   }
 
   // Mark that the event cannot be deallocated just yet.

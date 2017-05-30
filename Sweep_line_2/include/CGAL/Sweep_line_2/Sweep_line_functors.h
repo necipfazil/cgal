@@ -432,16 +432,8 @@ public:
    */
   Comparison_result operator()(const Subcurve* c1, const Subcurve* c2) const
   {
-    // CGAL_assertion(std::find((*m_curr_event)->right_curves_begin(),
-    //                          (*m_curr_event)->right_curves_end(), c1) !=
-    //                (*m_curr_event)->right_curves_end());
-    // 
-    // bool is_c2_right_curve =
-    //   (std::find((*m_curr_event)->right_curves_begin(),
-    //              (*m_curr_event)->right_curves_end(), c2) !=
-    //    (*m_curr_event)->right_curves_end());
-    // SL_SAYS TODO fix the setting of the bool
-    bool is_c2_right_curve = true;
+    CGAL_assertion( c1->left_event() == *m_curr_event );
+    bool is_c2_right_curve = ( c2->left_event() == *m_curr_event );
     return operator()(c1, c2, is_c2_right_curve,
                       Are_all_sides_oblivious_category());
   }

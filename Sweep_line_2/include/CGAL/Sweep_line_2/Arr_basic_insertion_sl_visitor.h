@@ -241,7 +241,7 @@ void Arr_basic_insertion_sl_visitor<Hlpr>::before_handle_event(Event* event)
     for (left_it = event->left_curves_rbegin();
          left_it != event->left_curves_rend(); ++left_it)
     {
-      he = (*left_it)->last_curve().halfedge_handle();
+      he = left_it->x_monotone_curve().halfedge_handle();
       if (he != invalid_he) {
         event->set_halfedge_handle(he->twin());
         return;
@@ -258,7 +258,7 @@ void Arr_basic_insertion_sl_visitor<Hlpr>::before_handle_event(Event* event)
          right_it != event->right_curves_rend(); ++right_it, ++i)
     {
       // Update the event with the highest right halfedge.
-      he = (*right_it)->last_curve().halfedge_handle();
+      he = right_it->x_monotone_curve().halfedge_handle();
       if (he != invalid_he) {
         event->set_subcurve_in_arrangement(i, true);
         if (event->halfedge_handle() == invalid_he)
@@ -276,23 +276,23 @@ void Arr_basic_insertion_sl_visitor<Hlpr>::before_handle_event(Event* event)
   for (iter = event->right_curves_rbegin();
        iter != event->right_curves_rend(); ++iter, ++i)
   {
-    he = (*iter)->last_curve().halfedge_handle();
+    he = iter->x_monotone_curve().halfedge_handle();
     if (he != invalid_he) {
       exist_right_halfedge = true;
       event->set_subcurve_in_arrangement(i, true);
-      if (!is_split_event(*iter, event)) {
+      if (!is_split_event(&(*iter), event)) {
         // halfedge will not be split. 
         event->set_halfedge_handle(he);
       }
       else {
-        he = split_edge((*iter)->last_curve().halfedge_handle(), (*iter),
+        he = split_edge(iter->x_monotone_curve().halfedge_handle(), &(*iter),
                         event->point());
         
         // 'he' has the same source as the split halfedge.
         event->set_halfedge_handle(he);
-        X_monotone_curve_2& last_curve =
-          const_cast<X_monotone_curve_2&>((*iter)->last_curve());
-        last_curve.set_halfedge_handle(he);
+        X_monotone_curve_2& x_monotone_curve =
+          const_cast<X_monotone_curve_2&>(iter->x_monotone_curve());
+        x_monotone_curve.set_halfedge_handle(he);
         
         //there cannot be another existing halfedge that need to be split
         // because they are disjoint
@@ -308,7 +308,7 @@ void Arr_basic_insertion_sl_visitor<Hlpr>::before_handle_event(Event* event)
   for (iter = event->left_curves_rbegin();
        iter != event->left_curves_rend(); ++iter)
   {
-    he =(*iter)->last_curve().halfedge_handle();
+    he =iter->x_monotone_curve().halfedge_handle();
     if (he != invalid_he) {
       event->set_halfedge_handle(he->twin());
       return;
@@ -331,7 +331,7 @@ add_subcurve(const X_monotone_curve_2& cv, Subcurve* sc)
   else {
     // sc is an overlap Subcurve of existing edge and new curve,
     // which means that the edeg will have to be modified
-    if (sc->originating_subcurve1()) {
+    if (sc->is_overlap()) {
       this->m_arr->modify_edge
         (this->current_event()->halfedge_handle()->next()->twin(), cv.base());
     }
@@ -627,7 +627,7 @@ Arr_basic_insertion_sl_visitor<Hlpr>::_ray_shoot_up(Status_line_iterator iter)
   // with a valid arrangement halfedge.
   const Halfedge_handle invalid_he;
   for (; iter != this->status_line_end(); ++iter) {
-    Halfedge_handle he = (*iter)->last_curve().halfedge_handle();
+    Halfedge_handle he = (*iter)->x_monotone_curve().halfedge_handle();
     // Return the incident face of the halfedge if found.
     if (he != invalid_he) return (he->face());
   }

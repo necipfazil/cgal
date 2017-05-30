@@ -106,15 +106,6 @@ void Basic_sweep_line_2<Tr, Visit, Crv, Evnt, Alloc>::PrintEventQueue()
 
 template <typename Tr, typename Visit, typename Crv, typename Evnt,
           typename Alloc>
-void Basic_sweep_line_2<Tr, Visit, Crv, Evnt, Alloc>::PrintSubCurves()
-{
-  print_text("Sub curves: ", true);
-  for (size_t i = 0; i < m_num_of_subCurves; ++i) m_subCurves[i].Print();
-  print_eol();
-}
-
-template <typename Tr, typename Visit, typename Crv, typename Evnt,
-          typename Alloc>
 void Basic_sweep_line_2<Tr, Visit, Crv, Evnt, Alloc>::PrintStatusLine()
 {
   if (m_statusLine.size() == 0) {
@@ -190,14 +181,14 @@ print_event_info(const Event* e)
   increase_indent();
   Event_subcurve_const_iterator iter;
   for (iter = e->left_curves_begin(); iter != e->left_curves_end(); ++iter) {
-    print_curve(*iter);
+    print_curve(&(*iter));
     print_eol();
   }
   decrease_indent();
   print_text("Right curves:", true);
   increase_indent();
   for (iter = e->right_curves_begin(); iter != e->right_curves_end(); ++iter) {
-    print_curve(*iter);
+    print_curve(&(*iter));
     print_eol();
   }
   decrease_indent();

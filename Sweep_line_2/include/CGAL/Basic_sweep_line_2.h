@@ -539,7 +539,6 @@ protected:
   void print_event_info(const Event* e);
 
   void PrintEventQueue();
-  void PrintSubCurves();
   void PrintStatusLine();
   void PrintOpenBoundaryType(Arr_parameter_space x, Arr_parameter_space y);
   void PrintEvent(const Event* e);

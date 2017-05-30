@@ -88,7 +88,7 @@ public:
   {}
 
   /*! Constructor from an x-monotone curve. */
-  Arr_construction_subcurve(X_monotone_curve_2& curve) :
+  Arr_construction_subcurve(const X_monotone_curve_2& curve) :
     Base( curve),
     m_lastEvent(0),
     m_index(0)

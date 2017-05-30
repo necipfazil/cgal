@@ -192,8 +192,8 @@ protected:
    */
   Event* _create_intersection_point(const Point_2& xp,
                                   unsigned int mult,
-                                  Subcurve*& c1,
-                                  Subcurve*& c2,
+                                  Subcurve* c1,
+                                  Subcurve* c2,
                                   bool is_overlap = false);
 
 };
