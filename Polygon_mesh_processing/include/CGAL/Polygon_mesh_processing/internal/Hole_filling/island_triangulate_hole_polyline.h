@@ -1,5 +1,27 @@
-#ifndef ISLAND_TRIANGULATE_HOLE_POLYLINE_H
-#define ISLAND_TRIANGULATE_HOLE_POLYLINE_H
+// Copyright (c) 2018 GeometryFactory (France).
+// All rights reserved.
+//
+// This file is part of CGAL (www.cgal.org).
+// You can redistribute it and/or modify it under the terms of the GNU
+// General Public License as published by the Free Software Foundation,
+// either version 3 of the License, or (at your option) any later version.
+//
+// Licensees holding a valid commercial license may use this file in
+// accordance with the commercial license agreement provided with the software.
+//
+// This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+// WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+//
+// $URL$
+// $Id$
+// SPDX-License-Identifier: GPL-3.0+
+//
+//
+// Author(s)     : Konstantinos Katrioplas
+
+
+#ifndef CGAL_ISLAND_TRIANGULATE_HOLE_POLYLINE_H
+#define CGAL_ISLAND_TRIANGULATE_HOLE_POLYLINE_H
 
 #include <vector>
 #include <tuple>
@@ -18,24 +40,21 @@ namespace internal {
 template <typename PointRange>
 struct Domain
 {
-
   Domain() {}
 
-  // boundary should always be given without the stupid last(first) one.
-  // not used
-  Domain(PointRange& boundary) : boundary(boundary)
+  // boundary should always be given, the first and last point being different
+  // (boundary is considered to be closed)
+  Domain(PointRange& boundary)
+    : boundary(boundary.begin(),
+               boundary.end())
   {
-    std::size_t n_p = boundary.size();
-    if(boundary.size() > 0)
-      assert(boundary[n_p - 1] != boundary[0]);
+    CGAL_assertion(!boundary.empty() && boundary.back() != boundary.front());
   }
 
   // constructor with indices
-  Domain(std::vector<int> ids) : b_ids(ids) {}
+  Domain(const std::vector<int>& ids) : b_ids(ids) {}
 
-  ~Domain() {}
-
-  void add_hole(std::vector<int>& ids)
+  void add_hole(const std::vector<int>& ids)
   {
     holes_list.push_back(ids);
 
@@ -43,38 +62,36 @@ struct Domain
       h_ids.push_back(ids[i]);
   }
 
-  bool is_empty()
+  //SL_comments: shouldn't you test also if the boundary is empty?
+  bool is_empty() const
   {
     holes_list.empty() ? true : false;
   }
 
-  std::pair<int, int> get_access_edge()
+  std::pair<int, int> get_access_edge() const
   {
-    std::size_t number_of_points = b_ids.size();
-    assert(number_of_points > 0);
-    int i = b_ids[number_of_points - 1];
-    int k = b_ids[0];
-
-    return std::make_pair(i, k);
+    CGAL_assertion( b_ids.size()>1 );
+    return std::make_pair(b_ids.back(), b_ids.front());
   }
 
-  void print_boundary()
+  void print_boundary() const
   {
     print(boundary);
   }
 
-  void print_size()
+  void print_size() const
   {
     std::cout << boundary.size() << std::endl;
   }
 
   //data
+  // SL_comments: PointRange shouldn't be a template parameter and you should use a vector directly
   PointRange boundary; // not used in the main algorithm
   std::vector<PointRange> holes; // not used
 
-  std::vector<int> b_ids;
-  std::vector<int> h_ids;
-  std::vector<std::vector<int>> holes_list;
+  std::vector<int> b_ids; // comment?
+  std::vector<int> h_ids; // comment?
+  std::vector<std::vector<int> > holes_list;
 
 };
 
@@ -91,38 +108,40 @@ void print(PointRange &v)
 
 
 
-// partition permutations // 
+// partition permutations //
 // ---------------------- //
 
 struct Phi
 {
-  typedef std::pair<std::vector<int>, std::vector<int>> Sub_domains_pair;
-  void put(std::vector<int>& left, std::vector<int>& right)
+  typedef std::pair<std::vector<int>, std::vector<int> > Sub_domains_pair;
+  void put(const std::vector<int>& left, const std::vector<int>& right)
   {
     sub_domains_list.push_back(std::make_pair(left, right)); // preallocate list
   }
 
-  std::size_t size()
+  std::size_t size() const
   {
     return sub_domains_list.size();
   }
 
-  bool empty()
+  bool empty() const
   {
     return size() == 0 ? true : false;
   }
 
-  std::vector<int> lsubset(const int i)
+  // SL_comments: do you really want a copy?
+  std::vector<int> lsubset(const int i) const
   {
-    assert(i >= 0);
-    assert(i < sub_domains_list.size());
+    CGAL_assertion(i >= 0);
+    CGAL_assertion(i < sub_domains_list.size());
     return sub_domains_list[i].first;
   }
 
-  std::vector<int> rsubset(const int i)
+  // SL_comments: do you really want a copy?
+  std::vector<int> rsubset(const int i) const
   {
-    assert(i >= 0);
-    assert(i < sub_domains_list.size());
+    CGAL_assertion(i >= 0);
+    CGAL_assertion(i < sub_domains_list.size());
     return sub_domains_list[i].second;
   }
 
@@ -130,7 +149,7 @@ struct Phi
 };
 
 
-void do_permutations(std::vector<std::vector<int>>& hole_list, Phi& subsets)
+void do_permutations(std::vector<std::vector<int> >& hole_list, Phi& subsets)
 {
   if(hole_list.empty())
     return;
@@ -142,7 +161,7 @@ void do_permutations(std::vector<std::vector<int>>& hole_list, Phi& subsets)
 
   const int first = hs.front();
   const int last = hs.back();
-  //std::sort(hs.begin(), hs.end()); // already sorted
+  //std::sort(hs.begin(), hs.end()); // already sorted  ???
 
   for(int s = 0; s <= hs.size(); ++s) // s = number of holes on one (left) side
   {
@@ -162,6 +181,7 @@ void do_permutations(std::vector<std::vector<int>>& hole_list, Phi& subsets)
     int p = 0;
     while(!permutations.finished())
     {
+      // SL_comments: can't we use std::copy?
       for(int i=0; i<s; ++i)
       {
         p1[i] = permutations[i];
@@ -173,8 +193,8 @@ void do_permutations(std::vector<std::vector<int>>& hole_list, Phi& subsets)
       std::set_symmetric_difference(p1.begin(), p1.end(), hs.begin(), hs.end(),
                                     p2.begin());
 
-      assert(p1.size() == s);
-      assert(p2.size() == hs.size() - s);
+      CGAL_assertion(p1.size() == s);
+      CGAL_assertion(p2.size() == hs.size() - s);
 
       print(p1); std::cout << "-- "; print(p2); std::cout << std::endl;
 
@@ -190,7 +210,7 @@ void do_permutations(std::vector<std::vector<int>>& hole_list, Phi& subsets)
 template <typename PointRange>
 void split_domain(const Domain<PointRange>& init_domain,
                     Domain<PointRange>& left_dom, Domain<PointRange>& right_dom,
-                    const int& i, const int& pid, const int& k)
+                    const int i, const int pid, const int k) // SL_comments: parameter doc + better name for variables
 {
   typedef std::vector<int> Ids;
   Ids ids = init_domain.b_ids;
@@ -202,7 +222,7 @@ void split_domain(const Domain<PointRange>& init_domain,
 
   Ids::iterator it;
   it = find(ids.begin(), ids.end(), pid);
-  assert(it != ids.end());
+  CGAL_assertion(it != ids.end());
 
   // left subset
   // from pid to i
@@ -222,7 +242,7 @@ void split_domain(const Domain<PointRange>& init_domain,
   // right subset
   // from k to pid
   it = find(ids.begin(), ids.end(), k);
-  assert(it != ids.end());
+  CGAL_assertion(it != ids.end());
 
   right.push_back(*it);
 
@@ -237,22 +257,23 @@ void split_domain(const Domain<PointRange>& init_domain,
   }
 
 
-  assert(left.front() == pid);
-  assert(left.back() == i);
-  assert(right.front() == k);
-  assert(right.back() == pid);
+  CGAL_assertion(left.front() == pid);
+  CGAL_assertion(left.back() == i);
+  CGAL_assertion(right.front() == k);
+  CGAL_assertion(right.back() == pid);
 
+  // SL_comments why not directly using left_dom and right_dom containers?
   left_dom.b_ids = left;
   right_dom.b_ids = right;
 
 }
 
-
-void reorder_island(std::vector<int>& h_ids, const int& v)
+// SL_comments: doc
+void reorder_island(std::vector<int>& h_ids, const int v)
 {
 
   std::vector<int>::iterator it = find(h_ids.begin(), h_ids.end(), v);
-  assert(it != h_ids.end());
+  CGAL_assertion(it != h_ids.end());
 
   // 2) rotate by the third vertex of t
   std::size_t dist = std::distance(h_ids.begin(), it); // std::size_t?
@@ -266,9 +287,9 @@ void reorder_island(std::vector<int>& h_ids, const int& v)
 
 }
 
-
+// SL_comments: doc
 void merge_id_sets(std::vector<int>& b_ids,
-                   const int& i, const int& v, const int& k,
+                   const int i, const int v, const int k,
                    std::vector<int>& hole_ids)
 {
   reorder_island(hole_ids, v);
@@ -280,14 +301,15 @@ void merge_id_sets(std::vector<int>& b_ids,
 
   b_ids.insert(insertion_point, hole_ids.begin(), hole_ids.end());
 
-  assert(*(b_ids.begin() + i) == b_ids[i] );
-  assert(b_ids.size() == initial_b_size + hole_ids.size());
+  CGAL_assertion(*(b_ids.begin() + i) == b_ids[i] );
+  CGAL_assertion(b_ids.size() == initial_b_size + hole_ids.size());
 
 }
 
+// SL_comments: doc
 template<typename PointRange>
 void join_domain(const Domain<PointRange>& domain, Domain<PointRange>& new_domain,
-                  const int& i, const int& v, const int& k)
+                  const int i, const int v, const int k)
 {
   typedef std::vector<int> Ids;
   Ids id_set = domain.b_ids;
@@ -300,7 +322,6 @@ void join_domain(const Domain<PointRange>& domain, Domain<PointRange>& new_domai
 
 struct Tracer
 {
-
   template <class LookupTable>
   void
   operator()(const LookupTable& lambda, int v0, int v1)
@@ -365,7 +386,7 @@ public:
               WC(WC)
               {}
 
-  std::size_t do_triangulation(const int& i, const int& k, std::size_t& count)
+  std::size_t do_triangulation(const int i, const int k, std::size_t& count)
   {
     processDomain(domain, i, k, count);
 
@@ -374,7 +395,7 @@ public:
   }
 
   void collect_triangles(std::vector<std::tuple<int, int, int>>& triplets,
-                         const int& i, const int& k)
+                         const int i, const int k)
   {
     Tracer tracer;
     tracer(lambda, i, k);
@@ -386,7 +407,7 @@ private:
 
   // main loop //
   // --------- //
-  void processDomain(Domain<PointRange> domain, const int& i, const int& k, std::size_t& count)
+  void processDomain(Domain<PointRange> domain, const int i, const int k, std::size_t& count)
   {
     // (i, k) = acccess edge
 
@@ -397,8 +418,8 @@ private:
     // base case
     if(domain.b_ids.size() == 3 && domain.holes_list.empty())
     {
-      //assert(domain.b_ids[0] == i); // access edge source
-      //assert(domain.b_ids[2] == k); // access edge target
+      //CGAL_assertion(domain.b_ids[0] == i); // access edge source
+      //CGAL_assertion(domain.b_ids[2] == k); // access edge target
 
       int m = domain.b_ids[1]; //third vertex
       std::cout<<"Evaluating t= ("<<i<<","<<m<<","<<k<<")"<<std::endl;
@@ -407,7 +428,7 @@ private:
 
       return;
     }
-    assert(domain.b_ids.size() >= 3);
+    CGAL_assertion(domain.b_ids.size() >= 3);
 
     // pid : third vertex
 
@@ -498,7 +519,7 @@ private:
   }
 
 
-  void calculate_weight(const int& i, const int& m, const int& k)
+  void calculate_weight(const int i, const int m, const int k)
   {
     std::vector<Point_3> Q;
 
@@ -540,10 +561,10 @@ private:
 
 
 } // namespace internal
-} // namsepace CGAL
+} // namespace CGAL
 
 
 
 
 
-#endif // ISLAND_TRIANGULATE_HOLE_POLYLINE_H
+#endif // CGAL_ISLAND_TRIANGULATE_HOLE_POLYLINE_H
